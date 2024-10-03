@@ -47,6 +47,10 @@ void GPIOPin::setType(Type pinType) {
             pinMode(pin, INPUT_PULLDOWN);
             digitalWrite(pin, LOW);
             break;
+        case IN_PULLDOWN_ISR:
+            pinMode(pin, INPUT_PULLDOWN);
+            digitalWrite(pin, LOW);
+            break;
         case IN_HARDWARE:
             pinMode(pin, INPUT);
             break;

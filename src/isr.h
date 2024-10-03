@@ -12,10 +12,19 @@
 extern double pidOutput;
 extern hw_timer_t* timer;
 extern Relay heaterRelay;
+extern Relay pumpRelay;
+bool pumpstrokes = false;
 
 unsigned int isrCounter = 0; // counter for ISR
 unsigned long windowStartTime;
 unsigned int windowSize = 1000;
+unsigned int flow = 0;
+#define STROKETIME  200    // Time Stroke ms
+
+
+void IRAM_ATTR gpioInterrupt() {
+    flow = flow + 1;
+}
 
 void IRAM_ATTR onTimer() {
     timerAlarmWrite(timer, 10000, true);
@@ -26,6 +35,16 @@ void IRAM_ATTR onTimer() {
     else {
         heaterRelay.on();
     }
+
+    //Pumpstrokes 
+    if (pumpstrokes) {               //Wenn Strokes on, wenn Dampf on, wenn wasser on?  
+        if (STROKETIME <= isrCounter) {
+                pumpRelay.off();
+        }
+        else {
+                pumpRelay.on();
+        }
+    } 
 
     isrCounter += 10; // += 10 because one tick = 10ms
 

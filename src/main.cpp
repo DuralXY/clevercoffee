@@ -143,6 +143,7 @@ unsigned long timeOptocouplerOn = 0;                       // time optocoupler s
 unsigned long lastTimeOptocouplerOn = 0;                   // last time optocoupler was ON
 bool steamQM_active = false;                               // steam-mode is active
 bool brewSteamDetectedQM = false;                          // brew/steam detected, not sure yet what it is
+unsigned long StrokeMillisTemp = millis();
 bool coolingFlushDetectedQM = false;
 
 // Pressure sensor
@@ -170,9 +171,26 @@ Relay pumpRelay(pumpRelayPin, PUMP_VALVE_SSR_TYPE);
 GPIOPin valveRelayPin(PIN_VALVE, GPIOPin::OUT);
 Relay valveRelay(valveRelayPin, PUMP_VALVE_SSR_TYPE);
 
+GPIOPin button1RelayPin(PIN_BUTTON1POWER, GPIOPin::OUT);
+Relay button1Relay(button1RelayPin, PUMP_VALVE_SSR_TYPE);
+GPIOPin button2RelayPin(PIN_BUTTON2POWER, GPIOPin::OUT);
+Relay button2Relay(button2RelayPin, PUMP_VALVE_SSR_TYPE);
+GPIOPin waterbuttonRelayPin(PIN_WATERBUTTONPOWER, GPIOPin::OUT);
+Relay waterbuttonRelay(waterbuttonRelayPin, PUMP_VALVE_SSR_TYPE);
+GPIOPin highpower1pin(PIN_HIGHPOWER1, GPIOPin::OUT);
+Relay highpower1Relay(highpower1pin, PUMP_VALVE_SSR_TYPE);
+GPIOPin highpower2pin(PIN_HIGHPOWER2, GPIOPin::OUT);
+Relay highpower2Relay(highpower2pin, PUMP_VALVE_SSR_TYPE);
+GPIOPin highpower3pin(PIN_HIGHPOWER3, GPIOPin::OUT);
+Relay highpower3Relay(highpower3pin, PUMP_VALVE_SSR_TYPE);
+GPIOPin lowpowerpin(PIN_LOWPOWER1, GPIOPin::OUT);
+Relay lowpowerRelay(lowpowerpin, PUMP_VALVE_SSR_TYPE);
+GPIOPin* waterSwitchPin;
 Switch* powerSwitch;
 Switch* brewSwitch;
 Switch* steamSwitch;
+Switch* waterSwitch;
+Switch* flowSensor;
 
 TempSensor* tempSensor;
 
@@ -318,6 +336,10 @@ double temperature, pidOutput;
 int steamON = 0;
 int steamFirstON = 0;
 
+// Variables Water
+int waterON = 0;
+int waterFirstON = 0;
+
 #if startTn == 0
 double startKi = 0;
 #else
@@ -447,6 +469,7 @@ const unsigned long intervalDisplay = 500;
 #include "powerHandler.h"
 #include "scaleHandler.h"
 #include "steamHandler.h"
+#include "waterHandler.h"
 
 // Emergency stop if temp is too high
 void testEmergencyStop() {
@@ -815,7 +838,7 @@ float filterPressureValue(float input) {
 
 void setEmergencyStopTemp() {
     if (machineState == kSteam || machineState == kCoolDown) {
-        if (EmergencyStopTemp != 145) EmergencyStopTemp = 145;
+        if (EmergencyStopTemp != 120) EmergencyStopTemp = 120;
     }
     else {
         if (EmergencyStopTemp != 120) EmergencyStopTemp = 120;
@@ -1791,11 +1814,16 @@ void setup() {
     pumpRelay.off();
 
     if (FEATURE_POWERSWITCH) {
-        powerSwitch = new IOSwitch(PIN_POWERSWITCH, GPIOPin::IN_HARDWARE, POWERSWITCH_TYPE, POWERSWITCH_MODE);
+        powerSwitch = new IOSwitch(PIN_POWERSWITCH, GPIOPin::IN_PULLDOWN, POWERSWITCH_TYPE, POWERSWITCH_MODE);
     }
 
     if (FEATURE_STEAMSWITCH) {
-        steamSwitch = new IOSwitch(PIN_STEAMSWITCH, GPIOPin::IN_HARDWARE, STEAMSWITCH_TYPE, STEAMSWITCH_MODE);
+        steamSwitch = new IOSwitch(PIN_STEAMSWITCH, GPIOPin::IN_PULLDOWN, STEAMSWITCH_TYPE, STEAMSWITCH_MODE);
+    }
+
+    if (FEATURE_WATERSWITCH) {
+
+        waterSwitch = new IOSwitch(PIN_WATERSWITCH, GPIOPin::IN_PULLDOWN, WATERSWITCH_TYPE, WATERSWITCH_MODE);
     }
 
     // IF optocoupler selected
@@ -1808,7 +1836,7 @@ void setup() {
         }
     }
     else if (FEATURE_BREWSWITCH) {
-        brewSwitch = new IOSwitch(PIN_BREWSWITCH, GPIOPin::IN_HARDWARE, BREWSWITCH_TYPE, BREWSWITCH_MODE);
+        brewSwitch = new IOSwitch(PIN_BREWSWITCH, GPIOPin::IN_PULLDOWN, BREWSWITCH_TYPE, BREWSWITCH_MODE);
     }
 
     if (LED_TYPE == LED::STANDARD) {
@@ -1825,6 +1853,8 @@ void setup() {
     if (FEATURE_WATER_SENS == 1) {
         waterSensor = new IOSwitch(PIN_WATERSENSOR, (WATER_SENS_TYPE == Switch::NORMALLY_OPEN ? GPIOPin::IN_PULLDOWN : GPIOPin::IN_PULLUP), Switch::TOGGLE, WATER_SENS_TYPE);
     }
+    flowSensor = new IOSwitch(PIN_FLOWESENSOR, GPIOPin::IN_PULLDOWN_ISR, Switch::TOGGLE, Switch::NORMALLY_OPEN);
+    attachInterrupt(digitalPinToInterrupt(PIN_FLOWESENSOR), gpioInterrupt, RISING);
 
 #if OLED_DISPLAY != 0
     u8g2.setI2CAddress(oled_i2c * 2);
@@ -1973,6 +2003,33 @@ void looppid() {
     testEmergencyStop(); // test if temp is too high
     bPID.Compute();      // the variable pidOutput now has new values from PID (will be written to heater pin in ISR.cpp)
 
+    flowForecast();
+
+    #define WATERCOMP 400
+    uint8_t waterSwitchReading = waterSwitch->isPressed();
+
+    // 100 % Power Wenn Tempdifferenz größer als 50 Grad
+    if ( setpoint - temperature > 50){
+        pidOutput = 1000; //direktes offset für pumpenleistung
+    }
+
+    // + WATERCOMP % Power um im brew das Wasser zu kompensieren 
+    if ((machineState == kBrew) && pidOutput < flow_Forecast ){
+        pidOutput = pidOutput + flow_Forecast; //direktes offset für pumpenleistung
+    }
+
+    //  100 % Power um im Steam das Wasser zu kompensieren  machineState == kSteam && 
+    if ((waterSwitchReading == HIGH) && pidOutput < flow_Forecast){
+        //pidOutput = 1000; //direktes offset für pumpenleistung
+        pidOutput = pidOutput + flow_Forecast; //direktes offset für pumpenleistung
+    }
+
+    //Thermoschutz 120 PID set 0 
+    if ( temperature > 120){
+        pidOutput = 0; //direktes offset für pumpenleistung
+        heaterRelay.off();
+    }
+
     if ((millis() - lastTempEvent) > tempEventInterval) {
         // send temperatures to website endpoint
         sendTempEvent(temperature, brewSetpoint, pidOutput / 10); // pidOutput is promill, so /10 to get percent value
@@ -2021,6 +2078,7 @@ void looppid() {
     }
 #endif
 
+    checkWaterSwitch();
     checkSteamSwitch();
     checkPowerSwitch();
 

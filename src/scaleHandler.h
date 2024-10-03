@@ -44,8 +44,11 @@ void scaleCalibrate(HX711_ADC loadCell, int pin, sto_item_id_t name, float* cali
     delay(2000);
 }
 
-float w1 = 0.0;
-float w2 = 0.0;
+float w1 = 0.0;void dedicaButton() {
+    //button1Relay.on();
+    //button2Relay.on();
+    //waterbuttonRelay.on();
+};
 
 /**
  * @brief Check measured weight

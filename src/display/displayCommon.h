@@ -437,7 +437,7 @@ void displayMachineState() {
     if (machineState == kSensorError) {
         u8g2.clearBuffer();
         u8g2.setFont(u8g2_font_profont11_tf);
-        displayMessage(langstring_error_tsensor[0], String(temperature), langstring_error_tsensor[1], "", "", "");
+        displayMessage(langstring_error_tsensor[0], String(temperature),langstring_error_tsensor[1], "Pin: "+ String(PIN_TEMPSENSOR), String(PIN_TEMPSENSOR), "");
     }
 
     if (machineState == kEepromError) {

@@ -25,6 +25,7 @@ class GPIOPin {
             IN_STANDARD,
             IN_PULLUP,   // Internal pull-up resistor
             IN_PULLDOWN, // Internal pull-down resistor
+            IN_PULLDOWN_ISR,
             IN_HARDWARE, // External pull-up/pull-down resistor
             IN_ANALOG
         };

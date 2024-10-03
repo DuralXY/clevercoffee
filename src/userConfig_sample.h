@@ -18,7 +18,8 @@ enum MACHINE {
     RancilioSilvia,  // MACHINEID 0
     RancilioSilviaE, // MACHINEID 1
     Gaggia,          // MACHINEID 2
-    QuickMill        // MACHINEID 3
+    QuickMill,        // MACHINEID 3
+    Dedica          // MACHINEID 4
 };
 
 /**
@@ -71,7 +72,6 @@ enum MACHINE {
 #define LED_TYPE              LED::STANDARD           // STANDARD_LED for an LED connected to a GPIO pin, WS2812 for adressable LEDs
 #define FEATURE_WATER_SENS    0                       // 0 = deactivated, 1 = activated
 #define WATER_SENS_TYPE       Switch::NORMALLY_CLOSED // Switch::NORMALLY_CLOSED for sensor XKC-Y25-NPN or Switch::NORMALLY_OPEN for XKC-Y25-PNP
-
 #define FEATURE_PRESSURESENSOR 0                      // 0 = deactivated, 1 = activated
 
 // Brew Scale
