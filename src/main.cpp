@@ -2014,12 +2014,12 @@ void looppid() {
     }
 
     // + WATERCOMP % Power um im brew das Wasser zu kompensieren 
-    if ((machineState == kBrew) && pidOutput < flow_Forecast ){
+    if ((machineState == kBrew) && pidOutput < flow_Forecast && setpoint > temperature ){
         pidOutput = pidOutput + flow_Forecast; //direktes offset für pumpenleistung
     }
 
     //  100 % Power um im Steam das Wasser zu kompensieren  machineState == kSteam && 
-    if ((waterSwitchReading == HIGH) && pidOutput < flow_Forecast){
+    if ((waterSwitchReading == HIGH) && pidOutput < flow_Forecast && setpoint > temperature){
         //pidOutput = 1000; //direktes offset für pumpenleistung
         pidOutput = pidOutput + flow_Forecast; //direktes offset für pumpenleistung
     }
